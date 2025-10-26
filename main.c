@@ -1,5 +1,5 @@
 #define MAXLINE 128
-#define USE_THREADING 0
+#define USE_THREADING 1
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -32,9 +32,17 @@ void child_recycle_handler(int sig)
 
 #else
 
-void thread_routine()
+#include <pthread.h>
+void thread_routine(void* arg)
 {
+    printf("[INFO]-enter thread]\r\n");
+    int connected_fd = *(int*)arg;
+    free(arg);
 
+    pthread_detach(pthread_self());
+    request_handle(connected_fd);
+    close(connected_fd);
+    printf("[INFO]-completed thread, recycle by kernel\r\n");
 }
 
 #endif
@@ -45,8 +53,12 @@ int main()
     int connected_fd;
     struct sockaddr peer_client;
     size_t peer_client_len;
-    int pid;
 
+#if USE_THREADING == 0
+    int pid;
+#else
+    unsigned long tid;
+#endif
     char client_host[MAXLINE], clietn_port[MAXLINE];
 
     int listen_fd = open_listenfd();
@@ -99,8 +111,12 @@ int main()
             break;
         }
 #else
+        // https://man7.org/linux/man-pages/man3/pthread_create.3.html
+        int* thread_connected_fd = malloc(sizeof(int));
+        *thread_connected_fd = connected_fd;
 
-
+        pthread_create(&tid, NULL, thread_routine, (void* )thread_connected_fd);
+        printf("[INFO]-create thread: %d sucessfully\r\n", tid);
 
 #endif
         
