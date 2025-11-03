@@ -25,8 +25,10 @@ int open_listenfd()
 
     result = getaddrinfo(NULL, LISTEN_PORT, &hints, &list_rp);
     if(result != 0){
+#if DEBUG_LOG == 1
         fprintf(stderr, "[ERROR]-getaddrinfo error: %s\r\n", gai_strerror(result));
         return -1;
+#endif
     }
 
     /**
@@ -35,12 +37,19 @@ int open_listenfd()
      * If socket() or bind() fails, we close the socket and try the next address.
      */
     for(rp = list_rp; rp != NULL ; rp = rp->ai_next){
-        getnameinfo(rp->ai_addr, rp->ai_addrlen, host_buf, HOST_MAXLEN, service_buf, SERVICE_MAXLEN, NI_NUMERICHOST);
-        printf("IPv4: %s, Port: %s\r\n", host_buf, service_buf);
-        
+        result = getnameinfo(rp->ai_addr, rp->ai_addrlen, host_buf, HOST_MAXLEN, service_buf, SERVICE_MAXLEN, NI_NUMERICHOST);
+#if DEBUG_LOG == 1
+        if(result == 0){
+            printf("[INFO]-Server listening for IPv4: %s, Port: %s\r\n", host_buf, service_buf);
+        }else{
+            printf("[ERROR]-failed to parse client info, the reason: %s\r\n", gai_strerror(result));
+        }
+#endif
         socket_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol); 
         if(socket_fd < 0){
-            // fprintf(stderr ,"[ERROR]-socket error: %s\r\n", stderr(error));
+#if DEBUG_LOG == 1
+            printf("[ERROR]-socket descriptor create error: %d\r\n", error);
+#endif
             continue;
         }
 
@@ -55,13 +64,17 @@ int open_listenfd()
 
     freeaddrinfo(list_rp);
     if(rp == NULL){
+#if DEBUG_LOG == 1
         fprintf(stderr, "[ERROR]-failed to bind protocol.\r\n");
+#endif
         return -1;
     }
     
     result = listen(socket_fd, MAX_CONNECTION);
     if(result < 0){
+#if DEBUG_LOG == 1
         fprintf(stderr, "[ERROR]-failed to listen protocol.\r\n");
+#endif
         close(socket_fd);
         return -1;
     }

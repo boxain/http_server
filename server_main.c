@@ -1,5 +1,5 @@
-#define MAXLINE 128
-#define USE_THREADING 1
+#define MAXLINE       128
+#define USE_THREADING 0
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -10,8 +10,10 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <pthread.h>
 
 #include "lib/open_listen.h"
+#include "lib/open_client.h"
 #include "lib/http_handler.h"
 
 
@@ -32,7 +34,6 @@ void child_recycle_handler(int sig)
 
 #else
 
-#include <pthread.h>
 void thread_routine(void* arg)
 {
     printf("[INFO]-enter thread]\r\n");
@@ -53,14 +54,15 @@ int main()
     int connected_fd;
     struct sockaddr peer_client;
     size_t peer_client_len;
-
+    int res;
+    char client_host[MAXLINE], clietn_port[MAXLINE];
 #if USE_THREADING == 0
     int pid;
 #else
     unsigned long tid;
 #endif
-    char client_host[MAXLINE], clietn_port[MAXLINE];
 
+    
     int listen_fd = open_listenfd();
     if(listen_fd < 0){
         exit(1);
@@ -68,8 +70,6 @@ int main()
 
 #if USE_THREADING == 0
     signal(SIGCHLD, child_recycle_handler);
-#else
-
 #endif
 
     while(1){
@@ -77,17 +77,27 @@ int main()
         connected_fd = accept(listen_fd, &peer_client, &peer_client_len);
         if(connected_fd < 0){
             // If system call be interrup by Signal
-            if(connected_fd == EINTR){
-                printf("[INFO]-system call accept be interrupt by Singal\r\n");
+            if(errno == EINTR){
+#if DEBUG_LOG == 1
+                printf("[INFO]-System call 'accept' be interrupt by Singal\r\n");
+#endif
                 continue;
             }else{
-                printf("[ERROR]-failed to accept connection of new client\r\n");
-                continue;
+#if DEBUG_LOG == 1
+                printf("[ERROR]-failed to accept connection of new client, error: %d\r\n", errno);
+#endif
+                break;
             }
         }
 
-        getnameinfo(&peer_client, peer_client_len, client_host, MAXLINE, clietn_port, MAXLINE, NI_NUMERICHOST);
-        printf("clietn IPv4: %s, Port: %s\r\n", client_host, clietn_port);
+        res = getnameinfo(&peer_client, peer_client_len, client_host, MAXLINE, clietn_port, MAXLINE, NI_NUMERICHOST);
+#if DEBUG_LOG == 1
+        if(res == 0){
+            printf("[INFO]-client IPv4: %s, Port: %s\r\n", client_host, clietn_port);
+        }else{
+            printf("[ERROR]-failed to parse client info, the reason: %s\r\n", gai_strerror(res));
+        }
+#endif
         
 #if USE_THREADING == 0
         // https://man7.org/linux/man-pages/man2/fork.2.html
@@ -99,14 +109,16 @@ int main()
              * Child process
              */
             close(listen_fd);
-            request_handle(connected_fd);
+            http_resquest_parser(connected_fd);
             close(connected_fd);
             exit(0);
         case -1:
+#if DEBUG_LOG == 1
             printf("[ERROR]-create child process failed\r\n");
+#endif
             break;
         default:
-            printf("[INFO]-parent process create child process: %d\r\n", pid);
+            printf("[INFO]-parent process create child process: %d\r\n\r\n", pid);
             close(connected_fd);
             break;
         }
@@ -116,20 +128,11 @@ int main()
         *thread_connected_fd = connected_fd;
 
         pthread_create(&tid, NULL, thread_routine, (void* )thread_connected_fd);
+#if DEBUG_LOG == 1
         printf("[INFO]-create thread: %d sucessfully\r\n", tid);
-
+#endif
+        
 #endif
         
     }
 }
-
-/** Resources
- * 
- * GDB:        https://zhuanlan.zhihu.com/p/1919803617872938161
- * Deassembly: https://huc0day.blog.csdn.net/article/details/151019122?spm=1001.2101.3001.6650.4&utm_medium=
- *             distribute.pc_relevant.none-task-blog-2%7Edefault%7EYuanLiJiHua%7EPosition-4-151019122-blog-86557911.
- *             235%5Ev43%5Epc_blog_bottom_relevance_base1&depth_1-utm_source=distribute.pc_relevant.none-task-blog-2%
- *             7Edefault%7EYuanLiJiHua%7EPosition-4-151019122-blog-86557911.235%5Ev43%5Epc_blog_bottom_relevance_base1&utm_relevant_index=9
- * Ubuntu ps command: 
- *             https://blog.csdn.net/weixin_42148809/article/details/135104281
- */

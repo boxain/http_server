@@ -42,7 +42,9 @@ void write_rio(int fd, char* buffer, size_t total_len)
     while(remain_bytes > 0){
         ssize_t written_bytes = write(fd, buffer, remain_bytes);
         if(written_bytes == -1){
+#if DEBUG_LOG == 1
             printf("[ERROR]-failed to send http response to client: %d", fd);
+#endif
             break;
         }else{
             buffer += written_bytes;

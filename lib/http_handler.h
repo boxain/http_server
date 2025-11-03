@@ -7,7 +7,13 @@
 #define VERSION_MAXLEN 10
 #define PAYLOAD_MAXLEN 512
 
+typedef enum {
+    GET,
+    POST
+} http_method;
 
-void request_handle(int connected_fd);
+void http_resquest_parser(int connected_fd);
+void http_request_create(int connected_fd, http_method method, char* host, char* uri);
+void http_response_parser(int connected_fd);
 
 #endif
