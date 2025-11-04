@@ -19,18 +19,14 @@
 
 #if USE_THREADING == 0
 
-#include <sys/types.h>
-#include <sys/wait.h>
+// #include <sys/types.h>
+// #include <sys/wait.h>
+// volatile sig_atomic_t g_sigchld_flag = 0;
 
-void child_recycle_handler(int sig)
-{
-    int status;
-    int pid;       
-    while(pid = waitpid(-1, &status, 0) > 0){  // be blocked until one of the childe process return
-        printf("[INFO]-recycle child process: %d, the status: %d\r\n", pid, status);
-    }
-    return;
-}
+// void child_recycle_handler(int sig)
+// {
+//     g_sigchld_flag = 1;
+// }
 
 #else
 
@@ -69,10 +65,33 @@ int main()
     }
 
 #if USE_THREADING == 0
-    signal(SIGCHLD, child_recycle_handler);
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+
+    // sa.sa_handler = child_recycle_handler;
+    sa.sa_flags = SA_NOCLDSTOP;
+    sa.sa_flags = SA_NOCLDSTOP | SA_NOCLDWAIT | SA_RESTART;
+    sigemptyset(&(sa.sa_mask));
+    
+    res = sigaction(SIGCHLD, &sa, NULL);
+    if(res < 0){
+#if DEBUG_LOG == 1
+        printf("[ERROR]-failed to set sigaction for SIGCHLD, error: %d\r\n", errno);
+#endif
+        exit(1);
+    }
 #endif
 
     while(1){
+        // if(g_sigchld_flag){
+        //     g_sigchld_flag = 0;
+        //     int status;
+        //     int pid;       
+        //     while((pid = waitpid(-1, &status, WNOHANG)) > 0){  // be blocked until one of the childe process return
+        //         printf("[INFO]-recycle child process: %d, the status: %d\r\n", pid, status);
+        //     }
+        // }
+
         peer_client_len = sizeof(peer_client);
         connected_fd = accept(listen_fd, &peer_client, &peer_client_len);
         if(connected_fd < 0){
