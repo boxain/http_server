@@ -1,6 +1,3 @@
-#define MAXLINE       128
-#define USE_THREADING 0
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,9 +9,13 @@
 #include <sys/socket.h>
 #include <pthread.h>
 
+#include "lib/config.h"
 #include "lib/open_listen.h"
 #include "lib/open_client.h"
 #include "lib/http_handler.h"
+
+
+int g_runtime_debug = 0;
 
 
 #if USE_THREADING == 0
@@ -45,8 +46,14 @@ void thread_routine(void* arg)
 #endif
 
 
-int main()
+int main(int argc, char* argv[])
 {
+
+    if(argc > 1 && strcmp(argv[1], "-d") == 0){
+        g_runtime_debug = 1;
+        printf("[SYSTEM]-Runtime debug log is ENABLED.\r\n");
+    }
+    
     int connected_fd;
     struct sockaddr peer_client;
     size_t peer_client_len;
@@ -69,7 +76,7 @@ int main()
     memset(&sa, 0, sizeof(sa));
 
     // sa.sa_handler = child_recycle_handler;
-    sa.sa_flags = SA_NOCLDSTOP;
+    // sa.sa_flags = SA_NOCLDSTOP;
     sa.sa_flags = SA_NOCLDSTOP | SA_NOCLDWAIT | SA_RESTART;
     sigemptyset(&(sa.sa_mask));
     
@@ -98,7 +105,9 @@ int main()
             // If system call be interrup by Signal
             if(errno == EINTR){
 #if DEBUG_LOG == 1
-                printf("[INFO]-System call 'accept' be interrupt by Singal\r\n");
+                if(g_runtime_debug){
+                    printf("[INFO]-System call 'accept' be interrupt by Singal\r\n");
+                }
 #endif
                 continue;
             }else{
@@ -112,7 +121,9 @@ int main()
         res = getnameinfo(&peer_client, peer_client_len, client_host, MAXLINE, clietn_port, MAXLINE, NI_NUMERICHOST);
 #if DEBUG_LOG == 1
         if(res == 0){
-            printf("[INFO]-client IPv4: %s, Port: %s\r\n", client_host, clietn_port);
+            if(g_runtime_debug){
+                printf("[INFO]-client IPv4: %s, Port: %s\r\n", client_host, clietn_port);
+            }
         }else{
             printf("[ERROR]-failed to parse client info, the reason: %s\r\n", gai_strerror(res));
         }
@@ -148,7 +159,9 @@ int main()
 
         pthread_create(&tid, NULL, thread_routine, (void* )thread_connected_fd);
 #if DEBUG_LOG == 1
-        printf("[INFO]-create thread: %d sucessfully\r\n", tid);
+        if(g_runtime_debug){
+            printf("[INFO]-create thread: %d sucessfully\r\n", tid);
+        }
 #endif
         
 #endif

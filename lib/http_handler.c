@@ -4,6 +4,7 @@
 
 #include "rio.h"
 #include "http_handler.h"
+#include "config.h"
 
 
 static char* method2string(http_method method)
@@ -33,13 +34,15 @@ static void http_response_create(int connected_fd, char* payload, size_t payload
         "Connection: close\r\n\r\n"
         "%s",payload_len, payload);
 #if CONN_TEST == 1
-#if DEBUG_LOG == 1
-    printf("[INFO]-Sleep 30 seconds\r\n\r\n");
-#endif
+    if(g_runtime_debug){
+        printf("[INFO]-Sleep 30 seconds\r\n\r\n");
+    }
     sleep(30);
 #endif
 
-    printf("---response header---\r\n%s\r\n", buf);
+    if(g_runtime_debug){
+        printf("---response header---\r\n%s\r\n", buf);
+    }
     write_rio(connected_fd, buf, response_len);
 } 
 
@@ -49,7 +52,9 @@ static void parse_header(int connected_fd)
     int read_bytes = readline_rio(connected_fd, buf, BUFFER_MAXLEN);
     
     while(read_bytes > 0 && strcmp(buf, "\r\n") != 0){
-        printf("%s", buf);
+        if(g_runtime_debug){
+            printf("%s", buf);
+        }
         readline_rio(connected_fd, buf, BUFFER_MAXLEN);
     }
     printf("\r\n");
@@ -64,9 +69,11 @@ void http_resquest_parser(int connected_fd)
      
     readline_rio(connected_fd, buf, BUFFER_MAXLEN);    
     sscanf(buf, "%s %s %s", method, uri, version);
-    
-    printf("---request header--- \r\n");
-    printf("%s  %s  %s\r\n", method, uri, version);
+
+    if(g_runtime_debug){
+        printf("---request header--- \r\n");
+        printf("%s  %s  %s\r\n", method, uri, version);
+    }
     parse_header(connected_fd);
 
     char payload[PAYLOAD_MAXLEN] = "Hello world !\r\n\0";
@@ -86,7 +93,9 @@ void http_request_create(int connected_fd, http_method method, char* host, char*
         method_str, uri, host
     );
 
-    printf("---request header---\r\n%s\r\n", buf);
+    if(g_runtime_debug){
+        printf("---request header---\r\n%s\r\n", buf);
+    }
     write_rio(connected_fd, buf, request_len);
 }
 
@@ -95,15 +104,22 @@ void http_response_parser(int connected_fd)
     char read_buf[BUFFER_MAXLEN];
     int readline_res;
    
-    printf("---server response--- \r\n");
+    if(g_runtime_debug){
+        printf("---server response--- \r\n");
+    }
 
     while(readline_res = readline_rio(connected_fd, read_buf, BUFFER_MAXLEN) > 0){
-        printf("%s", read_buf);
+        if(g_runtime_debug){
+            printf("%s", read_buf);
+        }
     }
 
     if(readline_res < 0){
+#if DEBUG_LOG == 1
         printf("[ERROR]-Read server response error\r\n");
+#endif
     }
-    
-    printf("---server response end--- \r\n");
+    if(g_runtime_debug){
+        printf("---server response end--- \r\n");
+    }
 }

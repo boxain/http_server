@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#include "config.h"
 #include "open_client.h"
 #include "http_handler.h"
 
@@ -44,13 +45,16 @@ void open_clientfd(void* arg)
      */
     for(rp = list_rp; rp != NULL ; rp=rp->ai_next){
         result = getnameinfo(rp->ai_addr, rp->ai_addrlen, host_buf, HOST_MAXLEN, service_buf, SERVICE_MAXLEN, NI_NUMERICHOST);
-#if DEBUG_LOG == 1
         if(result == 0){
-            printf("[INFO]-Server listening for IPv4: %s, Port: %s\r\n", host_buf, service_buf);
+            if(g_runtime_debug){
+                printf("[INFO]-Server listening for IPv4: %s, Port: %s\r\n", host_buf, service_buf);
+            }
         }else{
+#if DEBUG_LOG == 1
             printf("[ERROR]-failed to parse client info, the reason: %s\r\n", gai_strerror(result));
-        }
 #endif
+        }
+
         socket_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
         if(socket < 0){
 #if DEBUG_LOG == 1
